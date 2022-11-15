@@ -77,6 +77,7 @@ class Wavefunction:
             )
 
         self._masses = np.array([MASS_DICT[atom.lower()] for atom in self.atoms])
+        self._densities = dict()
 
         if strict:
             self.check_sanity()
@@ -133,6 +134,7 @@ class Wavefunction:
 
         from_funcs = {
             ".json": Wavefunction.from_orca_json,
+            ".fchk": Wavefunction.from_fchk,
         }
         from_funcs_for_str = (
             # ORCA
@@ -193,6 +195,14 @@ class Wavefunction:
         wf = wavefunction_from_molden(text, **kwargs)
         return wf
 
+    @staticmethod
+    @file_or_str(".molden", ".molden.input")
+    def from_fchk(text, **kwargs):
+        from pysisyphus.io.fchk import wavefunction_from_fchk
+
+        wf = wavefunction_from_fchk(text, **kwargs)
+        return wf
+
     @property
     def C_occ(self):
         occ_a, occ_b = self.occ
@@ -234,6 +244,18 @@ class Wavefunction:
         # The density matric is currently still in the MO basis. Transform
         # it to the AO basis and return.
         return C @ P @ C.T
+
+    def store_density(self, P, name, ao_or_mo="ao"):
+        assert P.ndim == 2, "Handling of alpha/beta densities is not yet implemented!"
+        if ao_or_mo == "mo":
+            C, _ = self.C
+            P_ao = C @ P @ C.T
+        elif ao_or_mo == "ao":
+            P_ao = P.copy()
+        self._densities[name] = P_ao
+
+    def get_density(self, name):
+        return self._densities[name]
 
     def eval_density(self, coords3d, P=None):
         if P is None:
